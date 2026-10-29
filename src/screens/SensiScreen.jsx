@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-
 export default function SensiScreen({ route, navigation }) {
   const { modelo } = route.params;
   const { ajustes: sensiAlta } = modelo; // La que viene por defecto de tu JSON es la Alta

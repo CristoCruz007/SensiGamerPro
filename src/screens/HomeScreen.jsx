@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons'; 
 import * as Haptics from 'expo-haptics';
 import * as Device from 'expo-device'; 
-import { estilosGamer } from '../data/EstilosGamer';
+import { estilosGamer, transformarTexto,ESPACIO_INVISIBLE } from '../data/EstilosGamer';
 
 // Importar componentes de AdMob para pantalla completa (Intersticial)
 import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
@@ -154,20 +154,25 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const generarNombresIA = () => {
-    if (!inputNombre.trim()) return;
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const base = inputNombre.trim();
-      
-      const mapeados = estilosGamer.map(estilo => estilo.replace(/{NAME}/g, base));
-      const mezclados = mapeados.sort(() => 0.5 - Math.random()).slice(0, 20);
+  // 2. Actualiza la función dentro de HomeScreen
+const generarNombresIA = () => {
+  if (!inputNombre.trim()) return;
+  try {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const base = inputNombre.trim();
+    
+    // Transforma cada nombre según la fuente del estilo
+    const mapeados = estilosGamer.map(item => {
+      const nombreTransformado = transformarTexto(base, item.fuente);
+      return item.formato.replace(/{NAME}/g, nombreTransformado);
+    });
 
-      setNombresGenerados(mezclados);
-    } catch (err) {
-      console.log("Error en Nombres IA:", err);
-    }
-  };
+    const mezclados = mapeados.sort(() => 0.5 - Math.random()).slice(0, 20);
+    setNombresGenerados(mezclados);
+  } catch (err) {
+    console.log("Error en Nombres IA:", err);
+  }
+};
 
   const copiarAlPortapapeles = (texto) => {
     Clipboard.setString(texto);
@@ -326,15 +331,26 @@ export default function HomeScreen({ navigation }) {
               </ScrollView>
 
               <View style={styles.modalActionsRow}>
-                {nombresGenerados.length > 0 && (
-                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FF4500' }]} onPress={generarNombresIA}>
-                    <Text style={[styles.actionBtnText, { color: '#fff' }]}>GENERAR</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#333' }]} onPress={cerrarModalNombres}>
-                  <Text style={[styles.actionBtnText, { color: '#fff' }]}>CERRAR</Text>
-                </TouchableOpacity>
-              </View>
+  {nombresGenerados.length > 0 ? (
+    // Si ya hay nombres generados, mostramos el botón de GENERAR más nuevo
+    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FF4500' }]} onPress={generarNombresIA}>
+      <Text style={[styles.actionBtnText, { color: '#fff' }]}>GENERAR</Text>
+    </TouchableOpacity>
+  ) : (
+    // Si todavía NO se han generado, mostramos el botón para copiar el espacio invisible
+    <TouchableOpacity 
+      style={[styles.actionBtn, { backgroundColor: '#00ffff' }]} 
+      onPress={() => copiarAlPortapapeles(ESPACIO_INVISIBLE)}
+    >
+      <Text style={[styles.actionBtnText, { color: '#000' }]}>COPIAR ESPACIO INVISIBLE</Text>
+    </TouchableOpacity>
+  )}
+
+  {/* Botón de cerrar siempre visible */}
+  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#333' }]} onPress={cerrarModalNombres}>
+    <Text style={[styles.actionBtnText, { color: '#fff' }]}>CERRAR</Text>
+  </TouchableOpacity>
+</View>
             </View>
           </View>
         </Modal>
