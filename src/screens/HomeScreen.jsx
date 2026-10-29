@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Modal, TextInput, ScrollView, Clipboard } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,7 +7,18 @@ import * as Haptics from 'expo-haptics';
 import * as Device from 'expo-device'; 
 import { estilosGamer } from '../data/EstilosGamer';
 
+// Importar componentes de AdMob para pantalla completa (Intersticial)
+import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
+
 const { width } = Dimensions.get('window');
+
+// ID de anuncio intersticial (Usa TestIds de Google para pruebas seguras)
+const interstitialAdUnitId = __DEV__ ? TestIds.INTERSTITIAL : 'ca-app-pub-tu-id-real/tu-interstitial-id';
+
+// Crear la instancia del anuncio de pantalla completa
+const interstitial = InterstitialAd.createForAdRequest(interstitialAdUnitId, {
+  requestNonPersonalizedAdsOnly: true,
+});
 
 export default function HomeScreen({ navigation }) {
   const [modalSensi, setModalSensi] = useState(false);
@@ -15,67 +26,131 @@ export default function HomeScreen({ navigation }) {
   const [inputNombre, setInputNombre] = useState('');
   const [nombresGenerados, setNombresGenerados] = useState([]);
   const [sensiResultado, setSensiResultado] = useState(null);
+  
+  // Estados para controlar el flujo de los anuncios de pantalla completa
+  const [interstitialLoaded, setInterstitialLoaded] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // 'sensi' o 'nombres'
+  const [pendingTipoSensi, setPendingTipoSensi] = useState(null);
 
+  useEffect(() => {
+    // Escuchar cuando el anuncio de pantalla completa termina de cargar
+    const unsubscribeLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
+      setInterstitialLoaded(true);
+    });
+
+    // Escuchar cuando el usuario CIERRA el anuncio de pantalla completa
+    const unsubscribeClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+      setInterstitialLoaded(false);
+      interstitial.load(); // Precargar el siguiente anuncio automáticamente
+
+      // Al cerrar el anuncio, abrimos la ventana que el usuario había solicitado
+      if (pendingAction === 'sensi' && pendingTipoSensi) {
+        calcularYMostrarSensi(pendingTipoSensi);
+        setPendingTipoSensi(null);
+      } else if (pendingAction === 'nombres') {
+        setModalNombres(true);
+      }
+      setPendingAction(null);
+    });
+
+    // Cargar el anuncio por primera vez al abrir la pantalla
+    interstitial.load();
+
+    return () => {
+      unsubscribeLoaded();
+      unsubscribeClosed();
+    };
+  }, [pendingAction, pendingTipoSensi]);
+
+  // Función interna para calcular la Sensi
+  const calcularYMostrarSensi = (tipo) => {
+    const ramBytes = Device.totalMemory;
+    const ramGB = ramBytes ? Math.round(ramBytes / (1024 * 1024 * 1024)) : 4;
+    const modeloCelular = Device.modelName || "Dispositivo Estándar";
+    const marcaCelular = Device.brand || "";
+    const esGamaAlta = ramGB >= 6 || marcaCelular.toLowerCase() === 'apple';
+
+    let baseGeneral = 170;
+    let factorProcesador = esGamaAlta ? 20 : 12;
+
+    if (tipo === 'baja') {
+      baseGeneral = Math.floor(120 + (ramGB * 1.5));
+      factorProcesador = esGamaAlta ? 25 : 18;
+    } else if (tipo === 'media') {
+      baseGeneral = Math.floor(165 + (ramGB * 2) + (esGamaAlta ? 5 : 2));
+    } else if (tipo === 'alta') {
+      baseGeneral = Math.floor(190 + (ramGB * 1.2));
+      factorProcesador = esGamaAlta ? 10 : 5;
+    }
+
+    const puntoRojo = Math.floor(baseGeneral - 6);
+    const mira2 = Math.floor(baseGeneral - factorProcesador);
+    const mira4 = Math.floor(baseGeneral - (factorProcesador * 1.3));
+    const awm = Math.floor(60 + (ramGB * 2.5));
+    const camara360 = Math.floor(baseGeneral - 4);
+
+    let dpiIdeal = 410;
+    if (ramGB > 4 && ramGB <= 6) dpiIdeal = 500;
+    if (ramGB > 6) dpiIdeal = 560;
+    if (marcaCelular.toLowerCase() === 'apple') dpiIdeal = 0;
+
+    if (tipo === 'baja' && dpiIdeal > 0) dpiIdeal = Math.floor(dpiIdeal * 0.85);
+    if (tipo === 'alta' && dpiIdeal > 0) dpiIdeal = Math.floor(dpiIdeal * 1.25);
+
+    let botonSugerido = "53%";
+    if (tipo === 'baja') botonSugerido = "58%";
+    if (tipo === 'alta') botonSugerido = "45%";
+
+    setSensiResultado({
+      tipo: tipo.toUpperCase(),
+      general: baseGeneral > 200 ? 200 : baseGeneral,
+      puntoRojo: puntoRojo > 200 ? 200 : puntoRojo,
+      mira2: mira2 > 200 ? 200 : mira2,
+      mira4: mira4 > 200 ? 200 : mira4,
+      awm: awm > 200 ? 200 : awm,
+      camara360: camara360 > 200 ? 200 : camara360,
+      dpi: dpiIdeal === 0 ? "Por Defecto (iOS)" : dpiIdeal,
+      botonDisparo: botonSugerido,
+      hardwareDetectado: `${marcaCelular} ${modeloCelular} (${ramGB}GB RAM)`
+    });
+    
+    setModalSensi(true);
+  };
+
+  // Botón SENSI IA: Muestra anuncio de pantalla completa antes de abrir resultados
   const generarSensiIA = (tipo = 'media') => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      const ramBytes = Device.totalMemory;
-      const ramGB = ramBytes ? Math.round(ramBytes / (1024 * 1024 * 1024)) : 4;
-      const modeloCelular = Device.modelName || "Dispositivo Estándar";
-      const marcaCelular = Device.brand || "";
-      const esGamaAlta = ramGB >= 6 || marcaCelular.toLowerCase() === 'apple';
-
-      // Base según el tipo de sensibilidad elegida
-      let baseGeneral = 170;
-      let factorProcesador = esGamaAlta ? 20 : 12;
-
-      if (tipo === 'baja') {
-        baseGeneral = Math.floor(120 + (ramGB * 1.5));
-        factorProcesador = esGamaAlta ? 25 : 18;
-      } else if (tipo === 'media') {
-        baseGeneral = Math.floor(165 + (ramGB * 2) + (esGamaAlta ? 5 : 2));
-      } else if (tipo === 'alta') {
-        baseGeneral = Math.floor(190 + (ramGB * 1.2));
-        factorProcesador = esGamaAlta ? 10 : 5;
+      if (interstitialLoaded) {
+        setPendingAction('sensi');
+        setPendingTipoSensi(tipo);
+        interstitial.show();
+      } else {
+        calcularYMostrarSensi(tipo);
+        interstitial.load();
       }
-
-      const puntoRojo = Math.floor(baseGeneral - 6);
-      const mira2 = Math.floor(baseGeneral - factorProcesador);
-      const mira4 = Math.floor(baseGeneral - (factorProcesador * 1.3));
-      const awm = Math.floor(60 + (ramGB * 2.5));
-      const camara360 = Math.floor(baseGeneral - 4);
-
-      let dpiIdeal = 410;
-      if (ramGB > 4 && ramGB <= 6) dpiIdeal = 500;
-      if (ramGB > 6) dpiIdeal = 560;
-      if (marcaCelular.toLowerCase() === 'apple') dpiIdeal = 0;
-
-      // Modificación de DPI según rango
-      if (tipo === 'baja' && dpiIdeal > 0) dpiIdeal = Math.floor(dpiIdeal * 0.85);
-      if (tipo === 'alta' && dpiIdeal > 0) dpiIdeal = Math.floor(dpiIdeal * 1.25);
-
-      // Ajustar tamaño del botón de disparo sugerido
-      let botonSugerido = "53%";
-      if (tipo === 'baja') botonSugerido = "58%";
-      if (tipo === 'alta') botonSugerido = "45%";
-
-      setSensiResultado({
-        tipo: tipo.toUpperCase(),
-        general: baseGeneral > 200 ? 200 : baseGeneral,
-        puntoRojo: puntoRojo > 200 ? 200 : puntoRojo,
-        mira2: mira2 > 200 ? 200 : mira2,
-        mira4: mira4 > 200 ? 200 : mira4,
-        awm: awm > 200 ? 200 : awm,
-        camara360: camara360 > 200 ? 200 : camara360,
-        dpi: dpiIdeal === 0 ? "Por Defecto (iOS)" : dpiIdeal,
-        botonDisparo: botonSugerido,
-        hardwareDetectado: `${marcaCelular} ${modeloCelular} (${ramGB}GB RAM)`
-      });
-      
-      setModalSensi(true);
     } catch (err) {
       console.log("Error en Sensi IA:", err);
+      calcularYMostrarSensi(tipo);
+    }
+  };
+
+  // Botón NOMBRES IA: Muestra anuncio de pantalla completa antes de abrir el creador de nombres
+  const abrirNombresIA = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      if (interstitialLoaded) {
+        setPendingAction('nombres');
+        interstitial.show();
+      } else {
+        setModalNombres(true);
+        interstitial.load();
+      }
+    } catch (err) {
+      console.log("Error en Nombres IA:", err);
+      setModalNombres(true);
     }
   };
 
@@ -105,7 +180,6 @@ export default function HomeScreen({ navigation }) {
     copiarAlPortapapeles(texto);
   };
 
-  // Limpiar el estado al cerrar el modal de nombres
   const cerrarModalNombres = () => {
     setModalNombres(false);
     setInputNombre('');
@@ -151,10 +225,7 @@ export default function HomeScreen({ navigation }) {
 
             <TouchableOpacity 
               style={[styles.iaButton, { borderColor: '#FF4500' }]} 
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setModalNombres(true);
-              }}
+              onPress={abrirNombresIA}
             >
               <Ionicons name="text-outline" size={18} color="#FF4500" />
               <Text style={[styles.iaButtonText, { color: '#FF4500' }]}>NOMBRES IA</Text>
@@ -171,7 +242,7 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.modalTitle}>⚡ SENSI IA CALCULADA ⚡</Text>
               <Text style={styles.modalHardware}>{sensiResultado?.hardwareDetectado}</Text>
               
-              {/* CONFIGURACIÓN DE LOS BOTONES: BAJA, MEDIA Y ALTA INTEGRADOS ACÁ */}
+              {/* CONFIGURACIÓN DE LOS BOTONES: BAJA, MEDIA Y ALTA */}
               <View style={{ flexDirection: 'row', backgroundColor: '#2A244D', borderRadius: 10, padding: 4, marginVertical: 12, width: '100%', borderWidth: 1, borderColor: '#3E3475' }}>
                 <TouchableOpacity 
                   style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: sensiResultado?.tipo === 'BAJA' ? '#00ffff' : 'transparent' }} 
