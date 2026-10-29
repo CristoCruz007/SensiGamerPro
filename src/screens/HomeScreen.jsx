@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Modal, TextInput, ScrollView, Clipboard } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Modal, TextInput, ScrollView, Clipboard, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons'; 
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons'; 
 import * as Haptics from 'expo-haptics';
 import * as Device from 'expo-device'; 
-import { estilosGamer, transformarTexto,ESPACIO_INVISIBLE } from '../data/EstilosGamer';
+import { estilosGamer, transformarTexto, ESPACIO_INVISIBLE } from '../data/EstilosGamer';
 
 // Importar componentes de AdMob para pantalla completa (Intersticial)
 import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
@@ -62,7 +62,14 @@ export default function HomeScreen({ navigation }) {
     };
   }, [pendingAction, pendingTipoSensi]);
 
-  // Función interna para calcular la Sensi
+  // Función para abrir tu enlace de TikTok
+  const abrirTikTok = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const urlTikTok = 'https://www.tiktok.com/@Cristoccc08';
+    Linking.openURL(urlTikTok).catch(err => console.error("No se pudo abrir TikTok", err));
+  };
+
+  // Función interna para calcular la Sensi y añadir frase motivadora
   const calcularYMostrarSensi = (tipo) => {
     const ramBytes = Device.totalMemory;
     const ramGB = ramBytes ? Math.round(ramBytes / (1024 * 1024 * 1024)) : 4;
@@ -101,6 +108,16 @@ export default function HomeScreen({ navigation }) {
     if (tipo === 'baja') botonSugerido = "58%";
     if (tipo === 'alta') botonSugerido = "45%";
 
+    // Frases motivadoras personalizadas según el nivel
+    let fraseMotivadora = '';
+    if (tipo === 'baja') {
+      fraseMotivadora = '🔥 "Precisión letal y control absoluto. Cada tiro a la cabeza es victoria."';
+    } else if (tipo === 'media') {
+      fraseMotivadora = '⚡ "Equilibrio perfecto entre velocidad y estabilidad. ¡A romper cabezas!"';
+    } else {
+      fraseMotivadora = '🚀 "¡Sensibilidad extrema! Velocidad pura para levantar mira al instante."';
+    }
+
     setSensiResultado({
       tipo: tipo.toUpperCase(),
       general: baseGeneral > 200 ? 200 : baseGeneral,
@@ -111,7 +128,8 @@ export default function HomeScreen({ navigation }) {
       camara360: camara360 > 200 ? 200 : camara360,
       dpi: dpiIdeal === 0 ? "Por Defecto (iOS)" : dpiIdeal,
       botonDisparo: botonSugerido,
-      hardwareDetectado: `${marcaCelular} ${modeloCelular} (${ramGB}GB RAM)`
+      hardwareDetectado: `${marcaCelular} ${modeloCelular} (${ramGB}GB RAM)`,
+      frase: fraseMotivadora
     });
     
     setModalSensi(true);
@@ -154,25 +172,23 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  // 2. Actualiza la función dentro de HomeScreen
-const generarNombresIA = () => {
-  if (!inputNombre.trim()) return;
-  try {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const base = inputNombre.trim();
-    
-    // Transforma cada nombre según la fuente del estilo
-    const mapeados = estilosGamer.map(item => {
-      const nombreTransformado = transformarTexto(base, item.fuente);
-      return item.formato.replace(/{NAME}/g, nombreTransformado);
-    });
+  const generarNombresIA = () => {
+    if (!inputNombre.trim()) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const base = inputNombre.trim();
+      
+      const mapeados = estilosGamer.map(item => {
+        const nombreTransformado = transformarTexto(base, item.fuente);
+        return item.formato.replace(/{NAME}/g, nombreTransformado);
+      });
 
-    const mezclados = mapeados.sort(() => 0.5 - Math.random()).slice(0, 20);
-    setNombresGenerados(mezclados);
-  } catch (err) {
-    console.log("Error en Nombres IA:", err);
-  }
-};
+      const mezclados = mapeados.sort(() => 0.5 - Math.random()).slice(0, 20);
+      setNombresGenerados(mezclados);
+    } catch (err) {
+      console.log("Error en Nombres IA:", err);
+    }
+  };
 
   const copiarAlPortapapeles = (texto) => {
     Clipboard.setString(texto);
@@ -181,7 +197,7 @@ const generarNombresIA = () => {
 
   const copiarSensiCompleta = () => {
     if (!sensiResultado) return;
-    const texto = `⚡ SENSI IA (Optimizado para ${sensiResultado.hardwareDetectado}) ⚡\nGeneral: ${sensiResultado.general}%\nPunto Rojo: ${sensiResultado.puntoRojo}%\nMira x2: ${sensiResultado.mira2}%\nMira x4: ${sensiResultado.mira4}%\nAWM: ${sensiResultado.awm}%\nCámara 360°: ${sensiResultado.camara360}%\nDPI Sugerido: ${sensiResultado.dpi}`;
+    const texto = `⚡ SENSI IA (${sensiResultado.tipo}) - Optimizado para ${sensiResultado.hardwareDetectado} ⚡\nGeneral: ${sensiResultado.general}%\nPunto Rojo: ${sensiResultado.puntoRojo}%\nMira x2: ${sensiResultado.mira2}%\nMira x4: ${sensiResultado.mira4}%\nAWM: ${sensiResultado.awm}%\nCámara 360°: ${sensiResultado.camara360}%\nDPI Sugerido: ${sensiResultado.dpi}\nBotón de Disparo: ${sensiResultado.botonDisparo}\n\n${sensiResultado.frase}`;
     copiarAlPortapapeles(texto);
   };
 
@@ -238,51 +254,103 @@ const generarNombresIA = () => {
           </View>
         </View>
         
-        <Text style={styles.textoAbajo}>DOMINA EL CAMPO DE BATALLA</Text>
+        {/* PIE DE PÁGINA CON TIKTOK */}
+        <View style={styles.footerContainer}>
+          <Text style={styles.textoAbajo}>DOMINA EL CAMPO DE BATALLA</Text>
+          
+          <TouchableOpacity style={styles.tiktokButton} onPress={abrirTikTok}>
+            <FontAwesome5 name="tiktok" size={16} color="#FFF" />
+            <Text style={styles.tiktokButtonText}>SÍGUEME EN TIKTOK: <Text style={{ color: '#00ffff' }}>@Cristoccc08</Text></Text>
+          </TouchableOpacity>
+        </View>
 
         {/* MODAL SENSI IA */}
         <Modal visible={modalSensi} transparent={true} animationType="fade">
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+            <View style={styles.modalContentCompact}>
               <Text style={styles.modalTitle}>⚡ SENSI IA CALCULADA ⚡</Text>
               <Text style={styles.modalHardware}>{sensiResultado?.hardwareDetectado}</Text>
               
-              {/* CONFIGURACIÓN DE LOS BOTONES: BAJA, MEDIA Y ALTA */}
-              <View style={{ flexDirection: 'row', backgroundColor: '#2A244D', borderRadius: 10, padding: 4, marginVertical: 12, width: '100%', borderWidth: 1, borderColor: '#3E3475' }}>
+              {/* BOTONES: BAJA, MEDIA Y ALTA */}
+              <View style={styles.nivelRowCompact}>
                 <TouchableOpacity 
-                  style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: sensiResultado?.tipo === 'BAJA' ? '#00ffff' : 'transparent' }} 
+                  style={[styles.nivelBtnCompact, sensiResultado?.tipo === 'BAJA' && styles.nivelBtnActive]} 
                   onPress={() => generarSensiIA('baja')}
                 >
-                  <Text style={{ color: sensiResultado?.tipo === 'BAJA' ? '#000' : '#aaa', fontWeight: 'bold', fontSize: 12 }}>BAJA</Text>
+                  <Text style={[styles.nivelTxtCompact, sensiResultado?.tipo === 'BAJA' && styles.nivelTxtActive]}>BAJA</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
-                  style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: sensiResultado?.tipo === 'MEDIA' ? '#00ffff' : 'transparent' }} 
+                  style={[styles.nivelBtnCompact, sensiResultado?.tipo === 'MEDIA' && styles.nivelBtnActive]} 
                   onPress={() => generarSensiIA('media')}
                 >
-                  <Text style={{ color: sensiResultado?.tipo === 'MEDIA' ? '#000' : '#aaa', fontWeight: 'bold', fontSize: 12 }}>MEDIA</Text>
+                  <Text style={[styles.nivelTxtCompact, sensiResultado?.tipo === 'MEDIA' && styles.nivelTxtActive]}>MEDIA</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
-                  style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: sensiResultado?.tipo === 'ALTA' ? '#00ffff' : 'transparent' }} 
+                  style={[styles.nivelBtnCompact, sensiResultado?.tipo === 'ALTA' && styles.nivelBtnActive]} 
                   onPress={() => generarSensiIA('alta')}
                 >
-                  <Text style={{ color: sensiResultado?.tipo === 'ALTA' ? '#000' : '#aaa', fontWeight: 'bold', fontSize: 12 }}>ALTA</Text>
+                  <Text style={[styles.nivelTxtCompact, sensiResultado?.tipo === 'ALTA' && styles.nivelTxtActive]}>ALTA</Text>
                 </TouchableOpacity>
               </View>
 
               {sensiResultado && (
-                <View style={styles.sensiList}>
-                  <Text style={styles.sensiItem}>General: <Text style={styles.sensiVal}>{sensiResultado.general}%</Text></Text>
-                  <Text style={styles.sensiItem}>Punto Rojo: <Text style={styles.sensiVal}>{sensiResultado.puntoRojo}%</Text></Text>
-                  <Text style={styles.sensiItem}>Mira x2: <Text style={styles.sensiVal}>{sensiResultado.mira2}%</Text></Text>
-                  <Text style={styles.sensiItem}>Mira x4: <Text style={styles.sensiVal}>{sensiResultado.mira4}%</Text></Text>
-                  <Text style={styles.sensiItem}>Mira AWM: <Text style={styles.sensiVal}>{sensiResultado.awm}%</Text></Text>
-                  <Text style={styles.sensiItem}>Cámara 360°: <Text style={styles.sensiVal}>{sensiResultado.camara360}%</Text></Text>
-                  <Text style={styles.sensiItem}>DPI Sugerido: <Text style={styles.sensiVal}>{sensiResultado.dpi}</Text></Text>
-                  <Text style={styles.sensiItem}>Botón de Disparo: <Text style={[styles.sensiVal, {color: '#00ffff'}]}>{sensiResultado.botonDisparo}</Text></Text>
+                <View style={styles.sensiListCompact}>
+                  <View style={styles.sensiRowCompact}>
+                    <View style={styles.sensiItemContainer}>
+                      <Ionicons name="flame" size={14} color="#FF4500" />
+                      <Text style={styles.sensiItemCompact}> General: <Text style={styles.sensiVal}>{sensiResultado.general}%</Text></Text>
+                    </View>
+                    <View style={styles.sensiItemContainer}>
+                      <Ionicons name="radio-button-on" size={14} color="#00ffff" />
+                      <Text style={styles.sensiItemCompact}> Punto Rojo: <Text style={styles.sensiVal}>{sensiResultado.puntoRojo}%</Text></Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.sensiRowCompact}>
+                    <View style={styles.sensiItemContainer}>
+                      <Ionicons name="eye-outline" size={14} color="#00ffff" />
+                      <Text style={styles.sensiItemCompact}> Mira x2: <Text style={styles.sensiVal}>{sensiResultado.mira2}%</Text></Text>
+                    </View>
+                    <View style={styles.sensiItemContainer}>
+                      <Ionicons name="search" size={14} color="#00ffff" />
+                      <Text style={styles.sensiItemCompact}> Mira x4: <Text style={styles.sensiVal}>{sensiResultado.mira4}%</Text></Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.sensiRowCompact}>
+                    <View style={styles.sensiItemContainer}>
+                      <Ionicons name="disc-outline" size={14} color="#FF9F43" />
+                      <Text style={styles.sensiItemCompact}> Mira AWM: <Text style={styles.sensiVal}>{sensiResultado.awm}%</Text></Text>
+                    </View>
+                    <View style={styles.sensiItemContainer}>
+                      <Ionicons name="sync" size={14} color="#FF9F43" />
+                      <Text style={styles.sensiItemCompact}> Cámara 360: <Text style={styles.sensiVal}>{sensiResultado.camara360}%</Text></Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.sensiRowCompact}>
+                    <View style={styles.sensiItemContainer}>
+                      <Ionicons name="hardware-chip-outline" size={14} color="#aaa" />
+                      <Text style={styles.sensiItemCompact}> DPI: <Text style={styles.sensiVal}>{sensiResultado.dpi}</Text></Text>
+                    </View>
+                    <View style={styles.sensiItemContainer}>
+                      <Ionicons name="color-filter-outline" size={14} color="#00ffff" />
+                      <Text style={styles.sensiItemCompact}> Botón: <Text style={[styles.sensiVal, {color: '#00ffff'}]}>{sensiResultado.botonDisparo}</Text></Text>
+                    </View>
+                  </View>
                 </View>
               )}
+
+              {/* FRASE MOTIVADORA COMPACTA */}
+              {sensiResultado && (
+                <View style={styles.motivationBoxCompact}>
+                  <Ionicons name="flash" size={14} color="#FF4500" />
+                  <Text style={styles.motivationTextCompact}>{sensiResultado.frase}</Text>
+                </View>
+              )}
+
               <View style={styles.modalActionsRow}>
                 <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#00ffff' }]} onPress={copiarSensiCompleta}>
                   <Text style={[styles.actionBtnText, { color: '#000' }]}>COPIAR SENSI</Text>
@@ -331,26 +399,23 @@ const generarNombresIA = () => {
               </ScrollView>
 
               <View style={styles.modalActionsRow}>
-  {nombresGenerados.length > 0 ? (
-    // Si ya hay nombres generados, mostramos el botón de GENERAR más nuevo
-    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FF4500' }]} onPress={generarNombresIA}>
-      <Text style={[styles.actionBtnText, { color: '#fff' }]}>GENERAR</Text>
-    </TouchableOpacity>
-  ) : (
-    // Si todavía NO se han generado, mostramos el botón para copiar el espacio invisible
-    <TouchableOpacity 
-      style={[styles.actionBtn, { backgroundColor: '#00ffff' }]} 
-      onPress={() => copiarAlPortapapeles(ESPACIO_INVISIBLE)}
-    >
-      <Text style={[styles.actionBtnText, { color: '#000' }]}>COPIAR ESPACIO INVISIBLE</Text>
-    </TouchableOpacity>
-  )}
+                {nombresGenerados.length > 0 ? (
+                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FF4500' }]} onPress={generarNombresIA}>
+                    <Text style={[styles.actionBtnText, { color: '#fff' }]}>GENERAR</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity 
+                    style={[styles.actionBtn, { backgroundColor: '#00ffff' }]} 
+                    onPress={() => copiarAlPortapapeles(ESPACIO_INVISIBLE)}
+                  >
+                    <Text style={[styles.actionBtnText, { color: '#000' }]}>COPIAR ESPACIO INVISIBLE</Text>
+                  </TouchableOpacity>
+                )}
 
-  {/* Botón de cerrar siempre visible */}
-  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#333' }]} onPress={cerrarModalNombres}>
-    <Text style={[styles.actionBtnText, { color: '#fff' }]}>CERRAR</Text>
-  </TouchableOpacity>
-</View>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#333' }]} onPress={cerrarModalNombres}>
+                  <Text style={[styles.actionBtnText, { color: '#fff' }]}>CERRAR</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -410,17 +475,57 @@ const styles = StyleSheet.create({
   rowButtonsContainer: { flexDirection: 'row', justifyContent: 'space-between', width: width * 0.85, gap: 15 },
   iaButton: { flex: 1, backgroundColor: '#1E1A3A', borderRadius: 15, borderWidth: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, gap: 8 },
   iaButtonText: { fontSize: 14, fontWeight: 'bold' },
-  textoAbajo: { color: '#555555', fontSize: 14, fontWeight: 'bold', letterSpacing: 1 },
+  
+  footerContainer: { alignItems: 'center', gap: 8, width: '100%' },
+  textoAbajo: { color: '#555555', fontSize: 13, fontWeight: 'bold', letterSpacing: 1 },
+  tiktokButton: { 
+    flexDirection: 'row', 
+    backgroundColor: '#1E1A3A', 
+    paddingVertical: 10, 
+    paddingHorizontal: 20, 
+    borderRadius: 20, 
+    borderWidth: 1.5, 
+    borderColor: '#FF4500', 
+    alignItems: 'center', 
+    gap: 8,
+    elevation: 4
+  },
+  tiktokButtonText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#1E1A3A', borderRadius: 20, padding: 20, width: '90%', alignItems: 'center', borderWidth: 2, borderColor: '#2A244D' },
-  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '900', marginBottom: 2 },
-  modalHardware: { color: '#00ffff', fontSize: 13, fontWeight: 'bold', marginBottom: 15, textTransform: 'uppercase' },
-  sensiList: { width: '100%', marginBottom: 15 },
-  sensiItem: { color: '#aaa', fontSize: 15, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#2A244D' },
+  
+  modalContentCompact: { 
+    backgroundColor: '#1E1A3A', 
+    borderRadius: 20, 
+    paddingHorizontal: 16, 
+    paddingVertical: 14, 
+    width: '84%', 
+    alignItems: 'center', 
+    borderWidth: 2, 
+    borderColor: '#3E3475' 
+  },
+  modalTitle: { color: '#fff', fontSize: 15, fontWeight: '900', marginBottom: 2 },
+  modalHardware: { color: '#00ffff', fontSize: 11, fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase' },
+  
+  nivelRowCompact: { flexDirection: 'row', backgroundColor: '#2A244D', borderRadius: 8, padding: 3, marginVertical: 6, width: '100%', borderWidth: 1, borderColor: '#3E3475' },
+  nivelBtnCompact: { flex: 1, paddingVertical: 5, alignItems: 'center', borderRadius: 6 },
+  nivelBtnActive: { backgroundColor: '#00ffff' },
+  nivelTxtCompact: { color: '#aaa', fontWeight: 'bold', fontSize: 11 },
+  nivelTxtActive: { color: '#000', fontWeight: '900' },
+
+  sensiListCompact: { width: '100%', marginVertical: 4 },
+  sensiRowCompact: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#2A244D' },
+  sensiItemContainer: { flexDirection: 'row', alignItems: 'center', width: '48%' },
+  sensiItemCompact: { color: '#aaa', fontSize: 12 },
   sensiVal: { color: '#fff', fontWeight: 'bold' },
-  modalActionsRow: { flexDirection: 'row', width: '100%', gap: 10, marginTop: 10 },
-  actionBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  actionBtnText: { fontWeight: 'bold', fontSize: 14 },
+  
+  motivationBoxCompact: { flexDirection: 'row', backgroundColor: '#141026', paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6, marginVertical: 6, alignItems: 'center', borderWidth: 1, borderColor: '#FF450055', width: '100%' },
+  motivationTextCompact: { color: '#FF9F43', fontSize: 10, fontStyle: 'italic', marginLeft: 6, flex: 1, fontWeight: '600' },
+
+  modalActionsRow: { flexDirection: 'row', width: '100%', gap: 8, marginTop: 4 },
+  actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+  actionBtnText: { fontWeight: 'bold', fontSize: 13 },
+  
   nombreCard: { backgroundColor: '#2A244D', paddingVertical: 12, paddingHorizontal: 15, borderRadius: 10, marginVertical: 5, width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   nombreText: { color: '#FF4500', fontWeight: 'bold', fontSize: 16, flex: 1 },
   copyIconBtn: { padding: 4 }

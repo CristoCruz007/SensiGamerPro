@@ -23,8 +23,6 @@ const interstitial = InterstitialAd.createForAdRequest(interstitialAdUnitId, {
   requestNonPersonalizedAdsOnly: true,
 });
 
-let sistemaLimpio = false;
-
 export default function OptimizacionScreen() {
   const ramBytes = Device.totalMemory;
   const totalRam = ramBytes ? Math.round(ramBytes / (1024 * 1024 * 1024)) : 6.0;
@@ -32,12 +30,13 @@ export default function OptimizacionScreen() {
   const totalStorage = totalRam > 4 ? 128 : 64; 
   const freeStorage = totalRam > 4 ? 45.2 : 21.8;
   
-  const [progress] = useState(new Animated.Value(sistemaLimpio ? 100 : 0)); 
-  const [rocketAnim] = useState(new Animated.Value(sistemaLimpio ? -20 : 0)); 
-  const [percent, setPercent] = useState(sistemaLimpio ? 100 : 0); 
+  const [sistemaLimpio, setSistemaLimpio] = useState(false);
+  const [progress] = useState(new Animated.Value(0)); 
+  const [rocketAnim] = useState(new Animated.Value(0)); 
+  const [percent, setPercent] = useState(0); 
   const [filesDeleted, setFilesDeleted] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState(sistemaLimpio ? 'SISTEMA OPTIMIZADO' : 'PELIGRO: SISTEMA LENTO');
+  const [status, setStatus] = useState('PELIGRO: SISTEMA LENTO');
   const [interstitialLoaded, setInterstitialLoaded] = useState(false);
 
   const appState = useRef(AppState.currentState);
@@ -58,12 +57,6 @@ export default function OptimizacionScreen() {
     interstitial.load();
 
     const subscription = AppState.addEventListener('change', nextAppState => {
-      if (
-        appState.current === 'active' && 
-        (nextAppState === 'background' || nextAppState === 'inactive')
-      ) {
-        sistemaLimpio = false;
-      }
       appState.current = nextAppState;
     });
 
@@ -78,7 +71,7 @@ export default function OptimizacionScreen() {
   const storageUsado = sistemaLimpio ? totalStorage - freeStorage - 2.4 : totalStorage - freeStorage;
 
   const startOptimization = () => {
-    if (sistemaLimpio) return; 
+    if (sistemaLimpio || loading) return; 
 
     setLoading(true);
     setStatus('ELIMINANDO BASURA ESPACIAL...');
@@ -96,18 +89,17 @@ export default function OptimizacionScreen() {
       easing: Easing.linear,
       useNativeDriver: false,
     }).start(() => {
-      sistemaLimpio = true; 
+      setSistemaLimpio(true); 
       setLoading(false);
-      setStatus('SISTEMA OPTIMIZADO');
+      setStatus('¡OPTIMIZADO CON ÉXITO! 🎯');
       
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Animated.spring(rocketAnim, { toValue: -20, friction: 2, useNativeDriver: true }).start();
 
-      // MOSTRAR ANUNCIO DE PANTALLA COMPLETA AQUÍ AL LLEGAR AL 100%
+      // MOSTRAR ANUNCIO DE PANTALLA COMPLETA AL LLEGAR AL 100%
       if (interstitialLoaded) {
         interstitial.show();
       } else {
-        // Si por alguna razón no cargó a tiempo, intentamos forzar la carga para la próxima
         interstitial.load();
       }
     });
@@ -153,7 +145,7 @@ export default function OptimizacionScreen() {
 
       <View style={styles.mainCard}>
         <Animated.View style={{ transform: [{ translateY: rocketAnim }] }}>
-          <Ionicons name={iconName} size={100} color={mainColor} />
+          <Ionicons name={iconName} size={90} color={mainColor} />
         </Animated.View>
 
         <Text style={[styles.statusText, { color: mainColor }]}>{status}</Text>
@@ -162,7 +154,12 @@ export default function OptimizacionScreen() {
           <Text style={styles.filesText}>Borrando: {filesDeleted.toLocaleString()} archivos...</Text>
         )}
 
-        <Text style={styles.percentText}>{percent}%</Text>
+        {/* FRASE MOTIVADORA CUANDO ESTÁ OPTIMIZADO */}
+        {sistemaLimpio ? (
+          <Text style={styles.motivationText}>🔥 "El dolor es temporal, dar todo rojo en escuadra es para siempre. ¡A ganar la partida!"</Text>
+        ) : (
+          <Text style={styles.percentText}>{percent}%</Text>
+        )}
       </View>
 
       <View style={styles.barBackground}>
@@ -181,16 +178,16 @@ export default function OptimizacionScreen() {
       <View style={styles.infoContainer}>
         <InfoBox icon="hardware-chip-outline" label="Memoria RAM" value={`${ramUsada.toFixed(1)} / ${totalRam.toFixed(1)} GB`} color="#00d2d3" />
         <InfoBox icon="folder-open-outline" label="Almacenamiento" value={`${storageUsado.toFixed(1)} / ${totalStorage.toFixed(0)} GB`} color="#ff9f43" />
-        <InfoBox icon="speedometer-outline" label="Estado CPU" value={sistemaLimpio ? "Frío" : "Caliente"} color="#ee5253" />
+        <InfoBox icon="speedometer-outline" label="Estado CPU" value={sistemaLimpio ? "Frío (Listo)" : "Caliente"} color="#ee5253" />
       </View>
 
       <TouchableOpacity
-        style={[styles.mainButton, { backgroundColor: loading || sistemaLimpio ? '#333' : mainColor }]}
+        style={[styles.mainButton, { backgroundColor: loading || sistemaLimpio ? '#222' : mainColor }]}
         onPress={startOptimization}
         disabled={loading || sistemaLimpio} 
       >
-        <Text style={[styles.buttonText, { color: loading || sistemaLimpio ? '#888' : '#000' }]}>
-          {loading ? 'LIMPIEZA EN PROCESO...' : sistemaLimpio ? 'SISTEMA AL 100%' : 'INICIAR MISIL DE LIMPIEZA'}
+        <Text style={[styles.buttonText, { color: loading || sistemaLimpio ? '#666' : '#000' }]}>
+          {loading ? 'LIMPIEZA EN PROCESO...' : sistemaLimpio ? 'SISTEMA AL 100% (OPTIMIZADO)' : 'INICIAR MISIL DE LIMPIEZA'}
         </Text>
       </TouchableOpacity>
 
@@ -217,10 +214,11 @@ const InfoBox = ({ icon, label, value, color }) => (
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   header: { fontSize: 26, fontWeight: '900', color: '#fff', letterSpacing: 1, marginBottom: 15, marginTop: Platform.OS === 'ios' ? 40 : 20 },
-  mainCard: { alignItems: 'center', justifyContent: 'center', width: '100%', height: 220, backgroundColor: '#1a1a1a', borderRadius: 20, marginBottom: 20, padding: 20, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.5, shadowRadius: 10 },
-  statusText: { fontSize: 18, fontWeight: 'bold', marginTop: 15, textAlign: 'center' },
+  mainCard: { alignItems: 'center', justifyContent: 'center', width: '100%', height: 220, backgroundColor: '#1a1a1a', borderRadius: 20, marginBottom: 20, padding: 15, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.5, shadowRadius: 10 },
+  statusText: { fontSize: 16, fontWeight: 'bold', marginTop: 10, textAlign: 'center' },
   filesText: { color: '#aaa', fontSize: 12, marginTop: 5, fontStyle: 'italic' },
-  percentText: { fontSize: 50, fontWeight: '900', color: '#fff', marginTop: 5 },
+  percentText: { fontSize: 45, fontWeight: '900', color: '#fff', marginTop: 5 },
+  motivationText: { color: '#2ed573', fontSize: 12, textAlign: 'center', marginTop: 10, paddingHorizontal: 10, fontWeight: '600', fontStyle: 'italic' },
   barBackground: { width: '100%', height: 15, backgroundColor: '#333', borderRadius: 10, overflow: 'hidden', marginBottom: 25, position: 'relative' },
   barFill: { height: '100%', borderRadius: 10 },
   barShine: { position: 'absolute', top: 0, left: 0, right: 0, height: '50%' },
@@ -229,6 +227,6 @@ const styles = StyleSheet.create({
   infoLabel: { color: '#888', fontSize: 11, marginTop: 5, textTransform: 'uppercase' },
   infoValue: { color: '#fff', fontWeight: 'bold', marginTop: 3, fontSize: 13 },
   mainButton: { width: '100%', paddingVertical: 18, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 16, fontWeight: 'bold', letterSpacing: 0.5 },
+  buttonText: { fontSize: 15, fontWeight: 'bold', letterSpacing: 0.5 },
   bannerContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 15, width: '100%' }
 });

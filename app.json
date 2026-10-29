@@ -5,16 +5,15 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cristo2000.SensiGamerPro"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#0f0f0f",
+        "foregroundImage": "./assets/icon.png"
       },
       "package": "com.cristo2000.SensiGamerPro"
     },
@@ -35,9 +34,5 @@
         "projectId": "1ff87246-87b6-4bf0-8b9c-42d830a49e8c"
       }
     }
-  },
-  "react-native-google-mobile-ads": {
-    "android_app_id": "ca-app-pub-3940256099942544~3375042508",
-    "ios_app_id": "ca-app-pub-3940256099942544~1458002511"
   }
 }
